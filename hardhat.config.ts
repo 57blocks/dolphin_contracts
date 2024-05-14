@@ -4,11 +4,11 @@ import "@nomicfoundation/hardhat-foundry";
 import "hardhat-contract-sizer";
 require("dotenv").config();
 
-
 const PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY as string;
 const OPSCAN_KEY = process.env.OPSCAN_API_KEY as string;
 const ARBSCAN_KEY = process.env.ARBSCAN_API_KEY as string;
 const BASESCAN_KEY = process.env.BASESCAN_API_KEY as string;
+const ETHERSCAN_KEY = process.env.ETHERSCAN_API_KEY as string;
 
 const config: HardhatUserConfig = {
   networks: {
@@ -36,7 +36,7 @@ const config: HardhatUserConfig = {
       url: "https://sepolia.infura.io/v3/452d2e71262a402cbed700a198b1b9c6",
       chainId: 11155111,
       accounts: [PRIVATE_KEY],
-    }
+    },
   },
   solidity: {
     compilers: [
@@ -72,10 +72,11 @@ const config: HardhatUserConfig = {
   },
   etherscan: {
     apiKey: {
+      mainnet: ETHERSCAN_KEY,
       optimisticEthereum: OPSCAN_KEY,
       arbitrumOne: ARBSCAN_KEY,
       base: BASESCAN_KEY,
-    }
+    },
   },
 };
 
