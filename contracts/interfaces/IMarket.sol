@@ -3,6 +3,13 @@ pragma solidity ^0.8.20;
 
 interface IMarket {
     event List(address indexed ipId, uint256 indexed assetId, address indexed sender);
+    event Remix(
+        address indexed parentIpId,
+        address indexed childIpId,
+        address indexed sender,
+        uint256 floorValue,
+        uint256 fee
+    );
     event Trade(
         TradeType indexed tradeType,
         address indexed ipId,
@@ -27,7 +34,8 @@ interface IMarket {
     enum TradeType {
         Mint,
         Buy,
-        Sell
+        Sell,
+        Remix
     }
 
     function buy(address ipId, uint256 amount) external payable;
