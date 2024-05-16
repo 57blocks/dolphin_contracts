@@ -7,6 +7,8 @@ interface IMarket {
         address indexed parentIpId,
         address indexed childIpId,
         address indexed sender,
+        address llicenseTemplate,
+        uint256 licenseTermsId,
         uint256 floorValue,
         uint256 fee
     );
@@ -32,7 +34,7 @@ interface IMarket {
     }
 
     enum TradeType {
-        Mint,
+        Mint, // 0
         Buy,
         Sell,
         Remix

@@ -1,4 +1,7 @@
 node_modules
+lib
 artifacts
 cache
+cache_forge
+out
 coverage

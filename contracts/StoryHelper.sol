@@ -8,6 +8,7 @@ import { IDisputeModule } from "./interfaces/story/IDisputeModule.sol";
 import { ILicensingModule } from "./interfaces/story/ILicensingModule.sol";
 import { ILicenseRegistry } from "./interfaces/story/ILicenseRegistry.sol";
 import { Licensing } from "./interfaces/story/Licensing.sol";
+import { ILicensingHook } from "./interfaces/story/ILicensingHook.sol";
 
 contract StoryHelper {
     IIPAssetRegistry public immutable ipAssetRegistry = IIPAssetRegistry(0xd43fE0d865cb5C26b1351d3eAf2E3064BE3276F6);
@@ -24,17 +25,33 @@ contract StoryHelper {
         return IERC721Metadata(_tokenContract).tokenURI(_tokenId);
     }
 
-    function getLicensingConfig(
+    function getLicensingConfigFee(
         address ipId,
+        address childIpId,
         address licenseTemplate,
         uint256 licenseTermsId
-    ) public view returns (bool, uint256, address) {
+    ) public returns (uint256) {
         Licensing.LicensingConfig memory config = licenseRegistry.getLicensingConfig(
             ipId,
             licenseTemplate,
             licenseTermsId
         );
-        return (config.isSet, config.mintingFee, config.licensingHook);
+
+        if (!config.isSet) {
+            return 0;
+        } else if (config.licensingHook == address(0)) {
+            return config.mintingFee;
+        } else {
+            return
+                ILicensingHook(config.licensingHook).beforeRegisterDerivative(
+                    msg.sender,
+                    childIpId,
+                    ipId,
+                    licenseTemplate,
+                    licenseTermsId,
+                    config.hookData
+                );
+        }
     }
 
     function isIP(address ipId) public view returns (bool) {

@@ -76,6 +76,7 @@ const config: HardhatUserConfig = {
       optimisticEthereum: OPSCAN_KEY,
       arbitrumOne: ARBSCAN_KEY,
       base: BASESCAN_KEY,
+      sepolia: ETHERSCAN_KEY,
     },
   },
 };

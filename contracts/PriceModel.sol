@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import { IPriceModel } from "./interfaces/IPriceModel.sol";
 import { ABDKMath64x64 } from "./library/ABDKMath64x64.sol";
 
-contract DefaultPriceModel is IPriceModel {
+contract PriceModel is IPriceModel {
     uint256 public constant BASE_PERCISION = 1e18;
 
     // int128 public immutable FP_MAGIC_NUMBER1 = ABDKMath64x64.divi(319381530000000000, int256(BASE_PERCISION));
@@ -22,7 +22,6 @@ contract DefaultPriceModel is IPriceModel {
     }
 
     function curve(uint256 x) public pure returns (uint256) {
-        uint supply = (x - 1 ether);
-        return supply == 0 ? 0 : (supply * supply * supply);
+        return x == 0 ? 0 : (x * x * x);
     }
 }
