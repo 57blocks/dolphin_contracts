@@ -80,19 +80,6 @@ contract MarketTest is ERC1155TokenReceiver, Test {
         return IERC20(_token).balanceOf(address(this));
     }
 
-    // function test_deposit_AccessFail() public {
-    //     vm.expectRevert(
-    //         "AccessControl: account 0x0000000000000000000000000000000000000000 is missing role 0x8b5b16d04624687fcf0d0228f19993c9157c1ed07b41d8d430fd9100eb099fe8"
-    //     );
-    //     vm.prank(address(0));
-    //     market.deposit(1000);
-    // }
-
-    // function test_deposit_AmountZero() public {
-    //     vm.expectRevert("please provide amount");
-    //     market.deposit(0);
-    // }
-
     function test_list_RevertWhenIsNotIP() public {
         vm.expectRevert("Address is not an IP");
         market.list(address(this));
