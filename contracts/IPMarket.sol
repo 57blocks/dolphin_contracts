@@ -9,7 +9,7 @@ import { IPriceModel } from "./interfaces/IPriceModel.sol";
 import { IMarket } from "./interfaces/IMarket.sol";
 import { ILicenseTemplate } from "./interfaces/story/ILicenseTemplate.sol";
 import { StoryHelper } from "./StoryHelper.sol";
-import { RemixingNFT } from "./RemixingNFT.sol";
+import { DolphinRemixNFT } from "./DolphinRemixNFT.sol";
 
 contract IPMarket is IMarket, Ownable, ERC1155 {
     uint256 public constant PERCENT_DIVISOR = 10_000;
@@ -18,7 +18,7 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
     uint256 public ipAssetIndex = 1;
     IPriceModel public defaultPriceModel;
     StoryHelper public storyHelper;
-    RemixingNFT public remixingNFT;
+    DolphinRemixNFT public remixNFT;
     Fee public fees = Fee(2, 0, 0.00001 ether, 1000);
     mapping(address => uint256) public ipIdToAssetId;
     mapping(uint256 => address) public assetIdToIpId;
@@ -27,7 +27,7 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
     mapping(address => uint256) public remixFloorPrice;
 
     constructor(address _storyHelper, address _priceModel) Ownable(msg.sender) ERC1155("") {
-        remixingNFT = new RemixingNFT();
+        remixNFT = new DolphinRemixNFT();
         storyHelper = StoryHelper(_storyHelper);
         defaultPriceModel = IPriceModel(_priceModel);
     }
@@ -136,8 +136,8 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
         uint256 parentAssetId = ipIdToAssetId[parentIpId];
         require(balanceOf(msg.sender, parentAssetId) >= PREMINT, "Insufficient balance");
         // Register childIP
-        uint256 tokenId = remixingNFT.mint(address(this), storyHelper.getIpUri(parentIpId));
-        childIpId = storyHelper.ipAssetRegistry().register(block.chainid, address(remixingNFT), tokenId);
+        uint256 tokenId = remixNFT.mint(address(this), storyHelper.getIpUri(parentIpId));
+        childIpId = storyHelper.ipAssetRegistry().register(block.chainid, address(remixNFT), tokenId);
         // Calc minting fee
         (address policy, , uint256 mintingLicenseFee, address currencyToken) = ILicenseTemplate(licenseTemplate)
             .getRoyaltyPolicy(licenseTermsId);
@@ -165,10 +165,11 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
         poolLiquidity[parentAssetId] -= sellPrice;
         emit Remix(parentIpId, childIpId, msg.sender, licenseTemplate, licenseTermsId, sellPrice, 0);
         uint256 childAssetId = _register(childIpId);
+        emit List(childIpId, childAssetId, msg.sender);
         poolLiquidity[childAssetId] += sellPrice;
         remixFloorPrice[childIpId] = sellPrice;
         emit Trade(TradeType.Mint, childIpId, childAssetId, msg.sender, PREMINT, sellPrice, 0);
-        remixingNFT.transferFrom(address(this), msg.sender, tokenId);
+        remixNFT.transferFrom(address(this), msg.sender, tokenId);
     }
 
     function checkListed(address ipId) public view returns (bool) {

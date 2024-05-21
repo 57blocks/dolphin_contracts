@@ -3,8 +3,8 @@ pragma solidity 0.8.24;
 
 import "forge-std/Test.sol";
 import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import { IPMarket } from "../../contracts/IPMarket.sol";
-import { DefaultPriceModel } from "../../contracts/DefaultPriceModel.sol";
+import { DolphinIPMarket } from "../../contracts/DolphinIPMarketSingle.sol";
+import { PriceModelSingle } from "../../contracts/PriceModelSingle.sol";
 import { StoryHelper } from "../../contracts/StoryHelper.sol";
 import { DolphinRemixNFT } from "../../contracts/DolphinRemixNFT.sol";
 
@@ -24,19 +24,19 @@ abstract contract ERC1155TokenReceiver {
     }
 }
 
-contract MarketTest is ERC1155TokenReceiver, Test {
+contract SingleMarketTest is ERC1155TokenReceiver, Test {
     //   address(this) 0x7FA9385bE102ac3EAc297483Dd6233D62b3e1496
     // the identifiers of the forks
     uint256 sepoliaFork;
     // deployments
-    IPMarket market;
+    DolphinIPMarket market;
     // address
     address public constant mockERC20 = 0xB132A6B7AE652c974EE1557A3521D53d18F6739f;
     address public constant treasury = 0x3C1226fcE5C6fD9319b8e0Ce646dd817453f5E79;
-    uint constant premint = 1 ether;
+    uint constant premint = 1;
     address constant lct = 0x260B6CB6284c89dbE660c0004233f7bB99B5edE7;
     uint constant lid = 21;
-    DefaultPriceModel public defaultPriceModel;
+    PriceModelSingle public defaultPriceModel;
     StoryHelper public storyHelper;
     DolphinRemixNFT public testNFT;
     address ipId;
@@ -55,10 +55,10 @@ contract MarketTest is ERC1155TokenReceiver, Test {
     function setUp() public {
         string memory SEPOLIA_RPC_URL = vm.envString("SEPOLIA_RPC_URL");
         sepoliaFork = vm.createSelectFork(SEPOLIA_RPC_URL, blockN);
-        defaultPriceModel = new DefaultPriceModel();
+        defaultPriceModel = new PriceModelSingle();
         storyHelper = new StoryHelper();
         testNFT = new DolphinRemixNFT();
-        market = new IPMarket(address(storyHelper), address(defaultPriceModel));
+        market = new DolphinIPMarket(address(storyHelper), address(defaultPriceModel));
         market.transferOwnership(treasury);
         uint256 amount = 2000000000 * wantUnit;
         deal(mockERC20, address(this), amount);
@@ -89,71 +89,56 @@ contract MarketTest is ERC1155TokenReceiver, Test {
     function test_list_Success() public {
         market.list(ipId);
         assertEq(market.ipAssetIndex(), 2);
-        assertEq(market.balanceOf(address(this), 1), 1 ether);
+        assertEq(market.balanceOf(address(this), 1), premint);
     }
 
     function test_buy_Success() public {
         market.list(ipId);
         assertEq(market.ipAssetIndex(), 2);
-        uint buyAmount = 1 ether;
-        uint price = market.getBuyPrice(ipId, buyAmount);
+        uint buyAmount = 1;
+        uint price = market.getBuyPrice(ipId);
         console.log("price: ", price);
-        market.buy{ value: 1 ether }(ipId, 1 ether);
+        market.buy{ value: 1 ether }(ipId);
         assertEq(market.balanceOf(address(this), ipId), premint + buyAmount);
-    }
-
-    function test_buy_ManyKeysSuccess() public {
-        market.list(ipId);
-        assertEq(market.ipAssetIndex(), 2);
-        uint buyAmount = 100 ether;
-        uint price = market.getBuyPrice(ipId, buyAmount);
+        price = market.getBuyPrice(ipId);
         console.log("price: ", price);
-        market.buy{ value: 100 ether }(ipId, buyAmount);
-        assertEq(market.balanceOf(address(this), ipId), buyAmount + premint);
-    }
+        market.buy{ value: 1 ether }(ipId);
+        assertEq(market.balanceOf(address(this), ipId), premint + buyAmount + 1);
 
-    function test_buy_HalfKeySuccess() public {
-        market.list(ipId);
-        assertEq(market.ipAssetIndex(), 2);
-        uint buyAmount = 0.5 ether;
-        uint tprice = market.getBuyPrice(ipId, 2 * buyAmount);
-        console.log("total price: ", tprice);
-        uint price = market.getBuyPrice(ipId, buyAmount);
-        console.log("price 1: ", price);
-        market.buy{ value: 1 ether }(ipId, buyAmount);
-        assertEq(market.balanceOf(address(this), ipId), buyAmount + premint);
-        uint price2 = market.getBuyPrice(ipId, buyAmount);
-        console.log("price 2: ", price2);
-        market.buy{ value: 1 ether }(ipId, buyAmount);
-        assertEq(tprice, price + price2);
+        price = market.getBuyPrice(ipId);
+        console.log("price: ", price);
+        market.buy{ value: 1 ether }(ipId);
+        assertEq(market.balanceOf(address(this), ipId), premint + buyAmount + 1 + 1);
     }
 
     function test_sell_Success() public {
         market.list(ipId);
         assertEq(market.ipAssetIndex(), 2);
-        uint price = market.getBuyPrice(ipId, 1 ether);
+        uint price = market.getBuyPrice(ipId);
         console.log("Buy price: ", price);
-        market.buy{ value: 1 ether }(ipId, 1 ether);
-
-        uint price2 = market.getSellPrice(ipId, 1 ether);
+        market.buy{ value: 1 ether }(ipId);
+        price = market.getBuyPrice(ipId);
+        console.log("Buy price: ", price);
+        assertEq(price, 179505844012331);
+        uint price2 = market.getSellPrice(ipId);
         console.log("Sell price: ", price2);
-        market.sell(ipId, 1 ether);
-        assertEq(market.balanceOf(address(this), ipId), 1 ether);
+        market.sell(ipId);
+        assertEq(market.balanceOf(address(this), ipId), premint);
     }
 
     function test_remix_Success() public {
         market.list(ipId);
         assertEq(market.ipAssetIndex(), 2);
-        uint price = market.getBuyPrice(ipId, 1 ether);
+        uint price = market.getBuyPrice(ipId);
         console.log("Buy price: ", price);
-        market.buy{ value: 1 ether }(ipId, 1 ether);
+        market.buy{ value: 1 ether }(ipId);
         address childIpId = market.remix(ipId, lct, lid);
         console.log("childIpId: ", childIpId);
-        uint price2 = market.getBuyPrice(childIpId, 1 ether);
+        uint price2 = market.getBuyPrice(childIpId);
         console.log("Child Buy price: ", price2);
         assertEq(price2, 2 * price);
 
-        uint price3 = market.getBuyPrice(ipId, 1 ether);
+        uint price3 = market.getBuyPrice(ipId);
         console.log("Parent Buy price: ", price3);
         assertEq(price3, price);
     }

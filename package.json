@@ -1,7 +1,7 @@
 {
-  "name": "capsatck-swap-contracts",
-  "version": "1.1.0",
-  "description": "contracts of capstack swap",
+  "name": "dolphin-market-contracts",
+  "version": "1.0.0",
+  "description": "contracts of dolphin ip market",
   "author": "capstack",
   "scripts": {
     "test": "npx hardhat test",

@@ -5,20 +5,22 @@ import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ERC1155 } from "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import { IPriceModel } from "./interfaces/IPriceModel.sol";
-import { IMarket } from "./interfaces/IMarket.sol";
+import { IPriceModelSingle } from "./interfaces/IPriceModelSingle.sol";
+import { IMarketSingle } from "./interfaces/IMarketSingle.sol";
 import { ILicenseTemplate } from "./interfaces/story/ILicenseTemplate.sol";
 import { StoryHelper } from "./StoryHelper.sol";
-import { RemixingNFT } from "./RemixingNFT.sol";
+import { DolphinRemixNFT } from "./DolphinRemixNFT.sol";
 
-contract IPMarket is IMarket, Ownable, ERC1155 {
+contract DolphinIPMarket is IMarketSingle, Ownable, ERC1155 {
     uint256 public constant PERCENT_DIVISOR = 10_000;
-    uint256 public constant PREMINT = 1 ether;
+    uint256 public constant PREMINT = 1;
+    string public constant name = "Dolphin";
+    string public constant symbol = "DOL";
 
     uint256 public ipAssetIndex = 1;
-    IPriceModel public defaultPriceModel;
+    IPriceModelSingle public defaultPriceModel;
     StoryHelper public storyHelper;
-    RemixingNFT public remixingNFT;
+    DolphinRemixNFT public remixNFT;
     Fee public fees = Fee(2, 0, 0.00001 ether, 1000);
     mapping(address => uint256) public ipIdToAssetId;
     mapping(uint256 => address) public assetIdToIpId;
@@ -27,9 +29,9 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
     mapping(address => uint256) public remixFloorPrice;
 
     constructor(address _storyHelper, address _priceModel) Ownable(msg.sender) ERC1155("") {
-        remixingNFT = new RemixingNFT();
+        remixNFT = new DolphinRemixNFT();
         storyHelper = StoryHelper(_storyHelper);
-        defaultPriceModel = IPriceModel(_priceModel);
+        defaultPriceModel = IPriceModelSingle(_priceModel);
     }
 
     function listBatch(address[] calldata ipIds) public {
@@ -48,47 +50,47 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
         emit Trade(TradeType.Mint, ipId, newAssetId, msg.sender, PREMINT, 0, 0);
     }
 
-    function getBuyPrice(address ipId, uint256 amount) public view returns (uint256 price) {
+    function getBuyPrice(address ipId) public view returns (uint256 price) {
         uint256 assetId = ipIdToAssetId[ipId];
-        price = defaultPriceModel.getPrice(totalSupply[assetId] - PREMINT, amount);
+        price = defaultPriceModel.getPrice(totalSupply[assetId]);
         uint256 floorPrice = remixFloorPrice[ipId];
         if (floorPrice > 0) {
-            price += (floorPrice * amount) / 1 ether;
+            price += floorPrice;
         }
     }
 
-    function getSellPrice(address ipId, uint256 amount) public view returns (uint256 price) {
+    function getSellPrice(address ipId) public view returns (uint256 price) {
         uint256 assetId = ipIdToAssetId[ipId];
-        price = defaultPriceModel.getPrice(totalSupply[assetId] - amount - PREMINT, amount);
+        price = defaultPriceModel.getPrice(totalSupply[assetId] - PREMINT);
         uint256 floorPrice = remixFloorPrice[ipId];
         if (floorPrice > 0) {
-            price += (floorPrice * amount) / 1 ether;
+            price += floorPrice;
         }
     }
 
-    function getBuyPriceAfterFee(address ipId, uint256 amount) public view returns (uint256) {
-        uint256 price = getBuyPrice(ipId, amount);
+    function getBuyPriceAfterFee(address ipId) public view returns (uint256) {
+        uint256 price = getBuyPrice(ipId);
         (, , uint256 totalFee) = _calcTradingFees(price);
         return price + totalFee;
     }
 
-    function getSellPriceAfterFee(address ipId, uint256 amount) public view returns (uint256) {
-        uint256 price = getSellPrice(ipId, amount);
+    function getSellPriceAfterFee(address ipId) public view returns (uint256) {
+        uint256 price = getSellPrice(ipId);
         (, , uint256 totalFee) = _calcTradingFees(price);
         return price - totalFee;
     }
 
-    function buy(address ipId, uint256 amount) public payable {
+    function buy(address ipId) public payable {
         require(checkListed(ipId), "IP is not listed");
-        uint256 price = getBuyPrice(ipId, amount);
+        uint256 price = getBuyPrice(ipId);
         (uint256 creatorFee, uint256 protocolFee, uint256 totalFee) = _calcTradingFees(price);
         uint256 priceAfterFee = price + totalFee;
         require(msg.value >= priceAfterFee, "Insufficient payment");
         uint256 assetId = ipIdToAssetId[ipId];
-        totalSupply[assetId] += amount;
+        totalSupply[assetId] += 1;
         poolLiquidity[assetId] += price;
-        _mint(msg.sender, assetId, amount, "");
-        emit Trade(TradeType.Buy, ipId, assetId, msg.sender, amount, price, creatorFee);
+        _mint(msg.sender, assetId, 1, "");
+        emit Trade(TradeType.Buy, ipId, assetId, msg.sender, 1, price, creatorFee);
         (bool creatorFeeSent, ) = payable(storyHelper.getIpOwner(ipId)).call{ value: creatorFee }("");
         require(creatorFeeSent, "Failed to send creator fee");
         if (protocolFee > 0) {
@@ -102,18 +104,18 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
         }
     }
 
-    function sell(address ipId, uint256 amount) public {
+    function sell(address ipId) public {
         require(checkListed(ipId), "IP is not listed");
         uint256 assetId = ipIdToAssetId[ipId];
-        require(balanceOf(msg.sender, assetId) >= amount, "Insufficient balance");
+        require(balanceOf(msg.sender, assetId) >= 1, "Insufficient balance");
         uint256 supply = totalSupply[assetId];
-        require(supply - amount >= PREMINT, "Supply not allowed below premint amount");
-        uint256 price = getSellPrice(ipId, amount);
+        require(supply - 1 >= PREMINT, "Supply not allowed below premint amount");
+        uint256 price = getSellPrice(ipId);
         (uint256 creatorFee, uint256 protocolFee, uint256 totalFee) = _calcTradingFees(price);
-        _burn(msg.sender, assetId, amount);
-        totalSupply[assetId] = supply - amount;
+        _burn(msg.sender, assetId, 1);
+        totalSupply[assetId] = supply - 1;
         poolLiquidity[assetId] -= price;
-        emit Trade(TradeType.Sell, ipId, assetId, msg.sender, amount, price, creatorFee);
+        emit Trade(TradeType.Sell, ipId, assetId, msg.sender, 1, price, creatorFee);
         (bool sent, ) = payable(msg.sender).call{ value: price - totalFee }("");
         (bool creatorFeeSent, ) = payable(storyHelper.getIpOwner(ipId)).call{ value: creatorFee }("");
         require(sent && creatorFeeSent, "Failed to send ether");
@@ -133,11 +135,12 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
             storyHelper.hasIpAttachedLicenseTerm(parentIpId, licenseTemplate, licenseTermsId),
             "IP does not have the license"
         );
+        require(!storyHelper.isDisputed(parentIpId), "IP is disputed");
         uint256 parentAssetId = ipIdToAssetId[parentIpId];
         require(balanceOf(msg.sender, parentAssetId) >= PREMINT, "Insufficient balance");
         // Register childIP
-        uint256 tokenId = remixingNFT.mint(address(this), storyHelper.getIpUri(parentIpId));
-        childIpId = storyHelper.ipAssetRegistry().register(block.chainid, address(remixingNFT), tokenId);
+        uint256 tokenId = remixNFT.mint(address(this), storyHelper.getIpUri(parentIpId));
+        childIpId = storyHelper.ipAssetRegistry().register(block.chainid, address(remixNFT), tokenId);
         // Calc minting fee
         (address policy, , uint256 mintingLicenseFee, address currencyToken) = ILicenseTemplate(licenseTemplate)
             .getRoyaltyPolicy(licenseTermsId);
@@ -159,16 +162,17 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
             storyHelper.licensingModule().registerDerivative(childIpId, _parents, _lids, licenseTemplate, "");
         }
         // Burn parent key
-        uint256 sellPrice = getSellPrice(parentIpId, PREMINT);
-        _burn(msg.sender, parentAssetId, PREMINT);
-        totalSupply[parentAssetId] -= PREMINT;
+        uint256 sellPrice = getSellPrice(parentIpId);
+        _burn(msg.sender, parentAssetId, 1);
+        totalSupply[parentAssetId] -= 1;
         poolLiquidity[parentAssetId] -= sellPrice;
         emit Remix(parentIpId, childIpId, msg.sender, licenseTemplate, licenseTermsId, sellPrice, 0);
         uint256 childAssetId = _register(childIpId);
+        emit List(childIpId, childAssetId, msg.sender);
         poolLiquidity[childAssetId] += sellPrice;
         remixFloorPrice[childIpId] = sellPrice;
         emit Trade(TradeType.Mint, childIpId, childAssetId, msg.sender, PREMINT, sellPrice, 0);
-        remixingNFT.transferFrom(address(this), msg.sender, tokenId);
+        remixNFT.transferFrom(address(this), msg.sender, tokenId);
     }
 
     function checkListed(address ipId) public view returns (bool) {
@@ -206,7 +210,7 @@ contract IPMarket is IMarket, Ownable, ERC1155 {
     }
 
     function setDefaultPriceModel(address _defaultPriceModel) external onlyOwner {
-        defaultPriceModel = IPriceModel(_defaultPriceModel);
+        defaultPriceModel = IPriceModelSingle(_defaultPriceModel);
     }
 
     function _calcTradingFees(
