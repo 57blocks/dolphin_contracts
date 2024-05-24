@@ -21,7 +21,7 @@ contract PriceModelSingle {
     int128 private immutable STD = ABDKMath64x64.fromUInt(700);
 
     function getPrice(uint256 supply) public view returns (uint256) {
-        return curve(supply);
+        return supply == 0 ? 0 : curve(supply);
     }
 
     function curve(uint256 x) public view returns (uint256) {

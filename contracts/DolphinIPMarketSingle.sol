@@ -12,10 +12,10 @@ import { StoryHelper } from "./StoryHelper.sol";
 import { DolphinRemixNFT } from "./DolphinRemixNFT.sol";
 
 contract DolphinIPMarket is IMarketSingle, Ownable, ERC1155 {
-    uint256 public constant PERCENT_DIVISOR = 10_000;
-    uint256 public constant PREMINT = 1;
     string public constant name = "Dolphin";
     string public constant symbol = "DOL";
+    uint256 public constant PERCENT_DIVISOR = 10_000;
+    uint256 public constant PREMINT = 1;
 
     uint256 public ipAssetIndex = 1;
     IPriceModelSingle public defaultPriceModel;
@@ -130,29 +130,47 @@ contract DolphinIPMarket is IMarketSingle, Ownable, ERC1155 {
         address licenseTemplate,
         uint256 licenseTermsId
     ) public returns (address childIpId) {
+        return remix(parentIpId, licenseTemplate, licenseTermsId, storyHelper.getIpUri(parentIpId));
+    }
+
+    function remix(
+        address parentIpId,
+        address licenseTemplate,
+        uint256 licenseTermsId,
+        string memory ipUri
+    ) public returns (address childIpId) {
         require(checkListed(parentIpId), "IP is not listed");
         require(
             storyHelper.hasIpAttachedLicenseTerm(parentIpId, licenseTemplate, licenseTermsId),
             "IP does not have the license"
         );
-        require(!storyHelper.isDisputed(parentIpId), "IP is disputed");
+        // @dev Story will checks that parent IP is not disputed
+        // require(!storyHelper.isDisputed(parentIpId), "IP is disputed");
         uint256 parentAssetId = ipIdToAssetId[parentIpId];
         require(balanceOf(msg.sender, parentAssetId) >= PREMINT, "Insufficient balance");
         // Register childIP
-        uint256 tokenId = remixNFT.mint(address(this), storyHelper.getIpUri(parentIpId));
+        uint256 tokenId = remixNFT.mint(address(this), ipUri);
         childIpId = storyHelper.ipAssetRegistry().register(block.chainid, address(remixNFT), tokenId);
         // Calc minting fee
         (address policy, , uint256 mintingLicenseFee, address currencyToken) = ILicenseTemplate(licenseTemplate)
             .getRoyaltyPolicy(licenseTermsId);
-        uint256 configFee = storyHelper.getLicensingConfigFee(parentIpId, childIpId, licenseTemplate, licenseTermsId);
-        if (configFee > 0) {
-            mintingLicenseFee = configFee;
+        {
+            uint256 configFee = storyHelper.getLicensingConfigFee(
+                parentIpId,
+                childIpId,
+                licenseTemplate,
+                licenseTermsId
+            );
+            if (configFee > 0) {
+                mintingLicenseFee = configFee;
+            }
         }
 
         if (mintingLicenseFee > 0) {
             IERC20(currencyToken).transferFrom(msg.sender, address(this), mintingLicenseFee);
             IERC20(currencyToken).approve(policy, mintingLicenseFee);
         }
+
         // Mint derivative
         {
             address[] memory _parents = new address[](1);

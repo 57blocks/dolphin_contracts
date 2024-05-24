@@ -143,5 +143,22 @@ contract SingleMarketTest is ERC1155TokenReceiver, Test {
         assertEq(price3, price);
     }
 
+    function test_remixWithUri_Success() public {
+        market.list(ipId);
+        assertEq(market.ipAssetIndex(), 2);
+        uint price = market.getBuyPrice(ipId);
+        console.log("Buy price: ", price);
+        market.buy{ value: 1 ether }(ipId);
+        address childIpId = market.remix(ipId, lct, lid, "test uri");
+        console.log("childIpId: ", childIpId);
+        uint price2 = market.getBuyPrice(childIpId);
+        console.log("Child Buy price: ", price2);
+        assertEq(price2, 2 * price);
+
+        uint price3 = market.getBuyPrice(ipId);
+        console.log("Parent Buy price: ", price3);
+        assertEq(price3, price);
+    }
+
     receive() external payable {}
 }
